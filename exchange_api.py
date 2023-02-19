@@ -26,7 +26,7 @@ async def send_request(api_key, curr_from, curr_to) -> ExchangeResponse:
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
         async with session.get(url, headers=headers) as resp:
             body = await resp.json()
-            print(body)
+
             return ExchangeResponse(
                 body.get('error'),
                 body.get('result'),
@@ -77,6 +77,6 @@ async def convert_to_main_curr(currency: str, exchange_currency=EXCHANGE_CURRENC
         return curr_to_exchange_resp
 
 
-if __name__ == '__main__':
-    import asyncio
-    asyncio.run(exchange("THB", "RUB"))
+# if __name__ == '__main__':
+#     import asyncio
+#     asyncio.run(exchange("THB", "RUB"))

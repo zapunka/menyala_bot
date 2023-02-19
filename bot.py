@@ -24,7 +24,8 @@ storage = MemoryStorage()
 bot = Bot(token=config.get('BOT_TOKEN'))
 dispatcher = Dispatcher(bot=bot, storage=storage)
 
-UP_RATE=0.4
+UP_RATE = 0.14
+
 
 class BotSM(StatesGroup):
     convert_sum_state = State()
@@ -38,7 +39,7 @@ def setup(dp: Dispatcher):
                                              and message.text.lower() != 'отменить',
                                 state=BotSM.convert_sum_state)
     dp.register_callback_query_handler(send_exchange_request,
-                                       lambda call_back: 'send-exchange-request' in call_back.data, state='*')
+                                       lambda call_back: 'send-request' in call_back.data, state='*')
     dp.register_callback_query_handler(go_home, lambda call_back: 'go-home' in call_back.data, state='*')
 
 
@@ -95,21 +96,25 @@ async def convert_sum(message: Message, state: FSMContext):
 
     # если валюта не USDT, то сначала смотрим курс к USDT, а потом USDT к бату
     # если валюта USDT - то сразу смотрим курс к бату
-    if currency == 'USDT':
-        resp = await exchange("USD", "THB")
-    else:
-        resp = await convert_to_main_curr(currency)
+    # if currency == 'USDT':
+    #     resp = await exchange("USD", "THB")
+    # else:
+    #     resp = await convert_to_main_curr(currency)
+    resp = await exchange("THB", currency)
 
     if resp.status == 200:
         rate = float(resp.result) + UP_RATE
+        total_amount = round(amount / rate, 2)
+
         async with state.proxy() as data:
-            data['exchange_rate'] = rate
-        total_amount = rate * amount
-        msg = f'В итоге вы получите {total_amount} ฿. Отправить заявку на обмен?'
+            data['exchange_rate'] = round(rate, 2)
+            data['total_exchange_amount'] = total_amount
+
+        msg = f'Курс обмена - {round(rate, 2)}\nВ итоге вы получите {total_amount} ฿\nОтправить заявку на обмен?'
 
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(InlineKeyboardButton(text='В начало', callback_data='go-home'),
-               InlineKeyboardButton(text='Отправить заявку', callback_data='send-exchange-request'))
+               InlineKeyboardButton(text='Отправить заявку', callback_data='send-request'))
 
         await bot.send_message(chat_id=message.chat.id,
                                reply_markup=kb,
@@ -135,9 +140,10 @@ async def send_exchange_request(call_back: CallbackQuery, state: FSMContext):
         currency = data['exchange_currency']
         amount = data['exchange_amount']
         rate = data['exchange_rate']
+        total_amount = data['total_exchange_amount']
 
     msg = f'Клиент {call_back.message.chat.username} запросил обмен валюты!' \
-          f'\nОбмен {currency} в количестве {amount} по курсу {rate}.' \
+          f'\nОбмен {currency} в количестве {amount} по курсу {rate}: итого {total_amount} ฿' \
           f'\nНеобходимо связаться с клиентом!'
     await _send_notify_msg(msg)
 
