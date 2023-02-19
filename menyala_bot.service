@@ -1,0 +1,15 @@
+[Unit]
+Description=MENYALA BOT
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/maksimovapi/menyala-bot/venv
+ExecStart=/home/maksimovapi/menyala-bot/venv/bin/python3 /home/maksimovapi/menyala-bot/bot.py
+RestartSec=10
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
