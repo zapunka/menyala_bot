@@ -3,15 +3,11 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ContentType
 from aiogram.dispatcher.filters.state import State, StatesGroup
-import aiohttp
-import asyncio
-import json
-import requests
+from enum import Enum
 import os
 from dotenv import dotenv_values
 
-from models import ExchangeResponse
-from exchange_api import exchange, convert_to_main_curr
+from exchange_api import exchange
 
 
 config = {
@@ -24,11 +20,25 @@ storage = MemoryStorage()
 bot = Bot(token=config.get('BOT_TOKEN'))
 dispatcher = Dispatcher(bot=bot, storage=storage)
 
-UP_RATE = 0.14
+UP_RATE = 0.12
+
+
+class GEOS(Enum):
+    chaweng = 'Чавенг'
+    lamai = 'Ламай'
+    lipanoi = 'Липа Ной'
+    naton = 'Натон'
+    bangpo = 'Банг По'
+    mainam = 'Маенам'
+    boput = 'Бо Пут'
+    chongmon = 'Чонг Мон'
+    maret = 'Марет'
+    talinggnam = 'Талинг Нгам'
 
 
 class BotSM(StatesGroup):
     convert_sum_state = State()
+    select_geo_state = State()
 
 
 def setup(dp: Dispatcher):
@@ -38,6 +48,8 @@ def setup(dp: Dispatcher):
                                              and message.content_type == ContentType.TEXT
                                              and message.text.lower() != 'отменить',
                                 state=BotSM.convert_sum_state)
+    dp.register_callback_query_handler(select_geo,
+                                       lambda call_back: 'select-geo' in call_back.data, state='*')
     dp.register_callback_query_handler(send_exchange_request,
                                        lambda call_back: 'send-request' in call_back.data, state='*')
     dp.register_callback_query_handler(go_home, lambda call_back: 'go-home' in call_back.data, state='*')
@@ -57,7 +69,7 @@ async def start_message(message: Message):
     kb.add(InlineKeyboardButton(text='Рубли ₽', callback_data='exchange_RUB'),
            InlineKeyboardButton(text='Гривны ₴', callback_data='exchange_UAH'))
     kb.add(InlineKeyboardButton(text='Тенге ₸', callback_data='exchange_KZT'),
-           InlineKeyboardButton(text='USDT', callback_data='exchange_USDT'))
+           InlineKeyboardButton(text='USDT', callback_data='exchange_USD'))
 
     await bot.send_message(chat_id=chat_id,
                            reply_markup=kb,
@@ -94,17 +106,19 @@ async def convert_sum(message: Message, state: FSMContext):
 
         return await exchange_currency(call_back, state)
 
-    # если валюта не USDT, то сначала смотрим курс к USDT, а потом USDT к бату
-    # если валюта USDT - то сразу смотрим курс к бату
-    # if currency == 'USDT':
-    #     resp = await exchange("USD", "THB")
-    # else:
-    #     resp = await convert_to_main_curr(currency)
-    resp = await exchange("THB", currency)
+    if currency == 'USD':
+        resp = await exchange("USD", "THB")
+    else:
+        resp = await exchange("THB", currency)
 
     if resp.status == 200:
         rate = float(resp.result) + UP_RATE
-        total_amount = round(amount / rate, 2)
+        print(f'rate = {rate}')
+
+        if currency == 'USD':
+            total_amount = round(amount * rate, 2)
+        else:
+            total_amount = round(amount / rate, 2)
 
         async with state.proxy() as data:
             data['exchange_rate'] = round(rate, 2)
@@ -114,7 +128,7 @@ async def convert_sum(message: Message, state: FSMContext):
 
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(InlineKeyboardButton(text='В начало', callback_data='go-home'),
-               InlineKeyboardButton(text='Отправить заявку', callback_data='send-request'))
+               InlineKeyboardButton(text='Отправить заявку', callback_data='select-geo'))
 
         await bot.send_message(chat_id=message.chat.id,
                                reply_markup=kb,
@@ -135,15 +149,35 @@ async def convert_sum(message: Message, state: FSMContext):
                                     'свяжется менеджер! Спасибо!')
 
 
+async def select_geo(call_back: CallbackQuery, state: FSMContext):
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton(text='Чавенг', callback_data='send-request_chaweng'),
+           InlineKeyboardButton(text='Ламай', callback_data='send-request_lamai'))
+    kb.add(InlineKeyboardButton(text='Липа Нои', callback_data='send-request_lipanoi'),
+           InlineKeyboardButton(text='Натон', callback_data='send-request_naton'))
+    kb.add(InlineKeyboardButton(text='Банг По', callback_data='send-request_bangpo'),
+           InlineKeyboardButton(text='Маенам', callback_data='send-request_mainam'))
+    kb.add(InlineKeyboardButton(text='Бопут', callback_data='send-request_boput'),
+           InlineKeyboardButton(text='Чонг Мон', callback_data='send-request_chongmon'))
+    kb.add(InlineKeyboardButton(text='Марет', callback_data='send-request_maret'),
+           InlineKeyboardButton(text='Талинг Нгам', callback_data='send-request_talinggnam'))
+    kb.add(InlineKeyboardButton(text='В начало', callback_data='go-home'))
+    await bot.send_message(chat_id=call_back.message.chat.id,
+                           reply_markup=kb,
+                           text='Выберите район, в котором вам будет удобно получить наличные.')
+
+
 async def send_exchange_request(call_back: CallbackQuery, state: FSMContext):
+    geo = call_back.data.split('_')[1]
     async with state.proxy() as data:
         currency = data['exchange_currency']
         amount = data['exchange_amount']
         rate = data['exchange_rate']
         total_amount = data['total_exchange_amount']
 
-    msg = f'Клиент {call_back.message.chat.username} запросил обмен валюты!' \
+    msg = f'Клиент @{call_back.message.chat.username} запросил обмен валюты!' \
           f'\nОбмен {currency} в количестве {amount} по курсу {rate}: итого {total_amount} ฿' \
+          f'\nРайон: {GEOS[geo].value}' \
           f'\nНеобходимо связаться с клиентом!'
     await _send_notify_msg(msg)
 
@@ -151,8 +185,11 @@ async def send_exchange_request(call_back: CallbackQuery, state: FSMContext):
     kb.add(InlineKeyboardButton(text='В начало', callback_data='go-home'))
     await bot.send_message(chat_id=call_back.message.chat.id,
                            reply_markup=kb,
-                           text='Ваша заявка получена. В течение нескольких минут с вами '
-                                'свяжется менеджер! Спасибо!')
+                           text='Ваша заявка получена. В течение нескольких минут с вами свяжется менеджер. Спасибо!')
+
+
+async def take_order(call_back: CallbackQuery, state: FSMContext):
+    manager_username = call_back.message.chat.username
 
 
 async def go_home(call_back: CallbackQuery):
@@ -165,8 +202,12 @@ async def _send_error_msg(message: str):
 
 
 async def _send_notify_msg(message: str):
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton(text='Взять в работу', callback_data='take-order'))
+
     for manager in config.get('MANAGERS').split(','):
         await bot.send_message(chat_id=manager,
+                               # reply_markup=kb,
                                text=message)
 
 

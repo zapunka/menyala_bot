@@ -58,25 +58,6 @@ async def exchange(curr_from, curr_to, tries_count=0) -> ExchangeResponse:
         return resp
 
 
-async def convert_to_main_curr(currency: str, exchange_currency=EXCHANGE_CURRENCY, main_currency=MAIN_CURRENCY):
-    curr_to_exchange_resp = await exchange(exchange_currency, currency)
-
-    if curr_to_exchange_resp.status == 200:
-        curr_to_exchange = float(curr_to_exchange_resp.result)
-        curr_to_main_resp = await exchange(exchange_currency, main_currency)
-
-        if curr_to_main_resp.status == 200:
-            curr_to_main = float(curr_to_main_resp.result)
-
-            curr_to_main_resp.result = round(curr_to_exchange / curr_to_main, 2)
-            return curr_to_main_resp
-        else:
-            return curr_to_main_resp
-
-    else:
-        return curr_to_exchange_resp
-
-
 # if __name__ == '__main__':
 #     import asyncio
 #     asyncio.run(exchange("THB", "RUB"))

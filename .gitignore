@@ -149,3 +149,4 @@ migrations/
 *.toml
 
 *.txt
+*.db

@@ -10,6 +10,11 @@ WorkingDirectory=/home/maksimovapi/menyala-bot/menyala_bot/venv
 ExecStart=/home/maksimovapi/menyala-bot/menyala_bot/venv/bin/python3 /home/maksimovapi/menyala-bot/menyala_bot/bot.py
 RestartSec=10
 Restart=always
+Environment="BOT_TOKEN=6201720834:AAG7SBENpsyBfZqE2t_CpUH2QNk16VWv9_M"
+Environment="API_URL=https://api.apilayer.com/exchangerates_data/convert"
+Environment="API_KEYS=e4ONh4no0WDrhMMqvdd81foWAPqWaHOQ,rdWUL7fnme3fOPE2ezXtSH8RNAUgE5Mm,9IyexwMnoCJjWFFFMKMGL4xpXRT2jDbW"
+Environment="DEVELOPER=279990051"
+Environment="MANAGERS=279990051,440024475,302108407"
 
 [Install]
 WantedBy=multi-user.target
