@@ -113,7 +113,6 @@ async def convert_sum(message: Message, state: FSMContext):
 
     if resp.status == 200:
         rate = float(resp.result) + UP_RATE
-        print(f'rate = {rate}')
 
         if currency == 'USD':
             total_amount = round(amount * rate, 2)
@@ -175,17 +174,19 @@ async def send_exchange_request(call_back: CallbackQuery, state: FSMContext):
         rate = data['exchange_rate']
         total_amount = data['total_exchange_amount']
 
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton(text='В начало', callback_data='go-home'))
+    await bot.send_message(chat_id=call_back.message.chat.id,
+                           reply_markup=kb,
+                           text='Ваша заявка получена. В течение нескольких минут с вами свяжется менеджер. Спасибо!')
+
     msg = f'Клиент @{call_back.message.chat.username} запросил обмен валюты!' \
           f'\nОбмен {currency} в количестве {amount} по курсу {rate}: итого {total_amount} ฿' \
           f'\nРайон: {GEOS[geo].value}' \
           f'\nНеобходимо связаться с клиентом!'
     await _send_notify_msg(msg)
 
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(InlineKeyboardButton(text='В начало', callback_data='go-home'))
-    await bot.send_message(chat_id=call_back.message.chat.id,
-                           reply_markup=kb,
-                           text='Ваша заявка получена. В течение нескольких минут с вами свяжется менеджер. Спасибо!')
+
 
 
 async def take_order(call_back: CallbackQuery, state: FSMContext):
